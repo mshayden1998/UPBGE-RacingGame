@@ -15,7 +15,8 @@ if not hasattr(bge, "__component__"):
     susp = bge.constraints.createVehicle(carId)
 
     keyboard = bge.logic.keyboard
-    ACTIVE = bge.logic.KX_INPUT_ACTIVE
+    key = bge.events
+    joysticks = bge.logic.joysticks
 
 class Component(bge.types.KX_PythonComponent):
     # Put your arguments here of the format ("key", default_value).
@@ -23,17 +24,19 @@ class Component(bge.types.KX_PythonComponent):
     args = OrderedDict([
         ("Name", ""),
         ("Brake", 0.0),
-        ("Force", 0.0),
+        ("TopSpeed", 0.0),
+        ("Acceleration", 0.0),
         ("SuspRestLength", 0.0),
         ("WheelRadius", 0.0),
-        ("Steer", 0.0)
+        ("SteerLimit", 0.0)
     ])
 
     def start(self, args):
         # Properties
-        self.force = args["Force"]
+        self.topSpeed = args["TopSpeed"]
+        self.acceleration = args["Acceleration"]
         self.brake = args["Brake"]
-        self.steer = args["Steer"]
+        self.steerLimit = args["SteerLimit"]
 
         # Add wheels
         downDir = [0,0,-1]
@@ -77,44 +80,38 @@ class Component(bge.types.KX_PythonComponent):
         susp.setTyreFriction(friction, 3)
 
     def update(self):
+        # Variables
+        steerVelocity = 0.05
         # Apply force fowards and backwards
-        if keyboard.events[bge.events.WKEY] == ACTIVE:
-            susp.applyEngineForce(self.force, 0)
-            susp.applyEngineForce(self.force, 1)
-            susp.applyEngineForce(self.force, 2)
-            susp.applyEngineForce(self.force, 3)
-        elif keyboard.events[bge.events.SKEY] == ACTIVE:
-            susp.applyEngineForce(-self.force, 0)
-            susp.applyEngineForce(-self.force, 1)
-            susp.applyEngineForce(-self.force, 2)
-            susp.applyEngineForce(-self.force, 3)
+        if keyboard.inputs[key.WKEY].active:
+            if car["Speed"] < self.topSpeed:
+                car["Speed"] += self.acceleration
+        elif keyboard.inputs[key.SKEY].active:
+            if car["Speed"] > -self.topSpeed:
+                car["Speed"] -= self.acceleration
         else:
-            susp.applyEngineForce(0, 0)
-            susp.applyEngineForce(0, 1)
-            susp.applyEngineForce(0, 2)
-            susp.applyEngineForce(0, 3)
+            car["Speed"] = 0.0
 
         # Steer Left and Right
-        if keyboard.events[bge.events.AKEY] == ACTIVE:
-            susp.setSteeringValue(self.steer, 0)
-            susp.setSteeringValue(self.steer, 1)
-        elif keyboard.events[bge.events.DKEY] == ACTIVE:
-            susp.setSteeringValue(-self.steer, 0)
-            susp.setSteeringValue(-self.steer, 1)
+        if keyboard.inputs[key.AKEY].active:
+            if car["Steer"] < self.steerLimit:
+                car["Steer"] += steerVelocity
+        elif keyboard.inputs[key.DKEY].active:
+            if car["Steer"] > -self.steerLimit:
+                car["Steer"] -= steerVelocity
         else:
-            susp.setSteeringValue(0, 0)
-            susp.setSteeringValue(0, 1)
-            susp.setSteeringValue(0, 2)
-            susp.setSteeringValue(0, 3)
+            car["Steer"] = 0.0
 
         # Apply brake force
-        if keyboard.events[bge.events.LEFTCTRLKEY] == ACTIVE:
+        if keyboard.inputs[key.LEFTCTRLKEY].active:
             susp.applyBraking(self.brake, 0)
             susp.applyBraking(self.brake, 1)
-            susp.applyBraking(self.brake, 2)
-            susp.applyBraking(self.brake, 3)
         else:
             susp.applyBraking(0, 0)
             susp.applyBraking(0, 1)
-            susp.applyBraking(0, 2)
-            susp.applyBraking(0, 3)
+
+        # Setters
+        susp.applyEngineForce(car["Speed"], 2)
+        susp.applyEngineForce(car["Speed"], 3)
+        susp.setSteeringValue(car["Steer"], 0)
+        susp.setSteeringValue(car["Steer"], 1)
